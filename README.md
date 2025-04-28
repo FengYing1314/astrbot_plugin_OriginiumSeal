@@ -2,6 +2,10 @@
 
 这是一个 AstrBot 插件，当检测到拍一拍事件时，会将用户的头像添加源石封印效果。(ps:明日方舟)
 
+##
+
+目前插件存在触发过于频繁的问题，可以尝试使用分支［zhewang448］(https://github.com/zhewang448/astrbot_plugin_OriginiumSeal-pro)
+
 ## 访问统计
 
 ## <a href="https://count.getloli.com/"><img src="https://count.getloli.com/get/@:astrbot_plugin_OriginiumSeal?theme=rule34"></a>
