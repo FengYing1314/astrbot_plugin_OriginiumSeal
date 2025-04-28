@@ -4,7 +4,7 @@
 
 ##
 
-目前插件存在触发过于频繁的问题，可以尝试使用分支［zhewang448］(https://github.com/zhewang448/astrbot_plugin_OriginiumSeal-pro)
+目前插件存在触发过于频繁的问题，可以尝试使用分支[zhewang448](https://github.com/zhewang448/astrbot_plugin_OriginiumSeal-pro)
 
 ## 访问统计
 
