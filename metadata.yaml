@@ -1,5 +1,5 @@
-name: OriginiumSeal # 这是你的插件的唯一识别名。
-desc: 这插件作用为检测拍一拍,使头像被源石封印 # 插件简短描述
-version: v1.0 # 插件版本号。格式：v1.1.1 或者 v1.1
-author: FengYing # 作者
-repo: https://github.com/FengYing1314/astrbot_plugin_OriginiumSeal # 插件的仓库地址
+name: OriginiumSeal
+desc: 这插件作用为检测拍一拍bot,使头像被源石封印,并且会进行随机禁言(更有乐趣?)
+version: v1.1
+author: FengYing
+repo: https://github.com/FengYing1314/astrbot_plugin_OriginiumSeal
