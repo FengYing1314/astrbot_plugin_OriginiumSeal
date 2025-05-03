@@ -144,10 +144,9 @@ class MyPlugin(Star):
                 can_mute = True
             if sender_role in ["admin","owner"]:
                 can_mute = False
+            yield event.plain_result("对方为管理员or群主,不能禁言捏~")
 
         try:
-            sender_id = event.get_sender_id()
-            
             # 调用独立的头像处理函数
             success, result, temp_img_path = await self.process_avatar(event, sender_id)
             
@@ -171,7 +170,6 @@ class MyPlugin(Star):
                     os.remove(temp_img_path)
             except Exception:
                 pass
-
         except Exception as e:
             logger.error(f"处理头像时出错: {str(e)}")
             yield event.plain_result(f"处理头像时出错: {str(e)}")
