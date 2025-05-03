@@ -144,7 +144,6 @@ class MyPlugin(Star):
                 can_mute = True
             if sender_role in ["admin","owner"]:
                 can_mute = False
-            yield event.plain_result("对方为管理员or群主,不能禁言捏~")
 
         try:
             # 调用独立的头像处理函数
