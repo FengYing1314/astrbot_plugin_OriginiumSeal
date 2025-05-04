@@ -4,7 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="fdd28210-baea-4a9d-8203-a821fd14d08e" name="更改" comment="解决了过于频繁触发的问题,并且增加了禁言的小功能" />
+    <list default="true" id="fdd28210-baea-4a9d-8203-a821fd14d08e" name="更改" comment="重建一下git" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -26,15 +26,20 @@
     </excluded-from-favorite>
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
-  <component name="GitHubPullRequestSearchHistory">{
-  &quot;lastFilter&quot;: {}
-}</component>
-  <component name="GithubPullRequestsUISettings">{
-  &quot;selectedUrlAndAccountId&quot;: {
-    &quot;url&quot;: &quot;https://github.com/FengYing1314/astrbot_plugin_test&quot;,
-    &quot;accountId&quot;: &quot;807a931f-9fda-4462-8421-93bc4f681ad1&quot;
+  <component name="GitHubPullRequestSearchHistory"><![CDATA[{
+  "history": [
+    {
+      "assignee": "FengYing1314"
+    }
+  ],
+  "lastFilter": {}
+}]]></component>
+  <component name="GithubPullRequestsUISettings"><![CDATA[{
+  "selectedUrlAndAccountId": {
+    "url": "https://github.com/FengYing1314/astrbot_plugin_OriginiumSeal",
+    "accountId": "807a931f-9fda-4462-8421-93bc4f681ad1"
   }
-}</component>
+}]]></component>
   <component name="ProblemsViewState">
     <option name="selectedTabId" value="ProjectErrors" />
   </component>
@@ -86,7 +91,7 @@
       <workItem from="1746197878436" duration="575000" />
       <workItem from="1746213724576" duration="3413000" />
       <workItem from="1746272362268" duration="603000" />
-      <workItem from="1746367984419" duration="824000" />
+      <workItem from="1746367984419" duration="1925000" />
     </task>
     <task id="LOCAL-00001" summary="解决了过于频繁触发的问题,并且增加了禁言的小功能">
       <option name="closed" value="true" />
@@ -96,7 +101,23 @@
       <option name="project" value="LOCAL" />
       <updated>1746198076404</updated>
     </task>
-    <option name="localTasksCounter" value="2" />
+    <task id="LOCAL-00002" summary="重建一下git">
+      <option name="closed" value="true" />
+      <created>1746372386736</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1746372386736</updated>
+    </task>
+    <task id="LOCAL-00003" summary="重建一下git">
+      <option name="closed" value="true" />
+      <created>1746372722483</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1746372722483</updated>
+    </task>
+    <option name="localTasksCounter" value="4" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -116,6 +137,10 @@
   <component name="VcsManagerConfiguration">
     <MESSAGE value="更新标点符号" />
     <MESSAGE value="解决了过于频繁触发的问题,并且增加了禁言的小功能" />
-    <option name="LAST_COMMIT_MESSAGE" value="解决了过于频繁触发的问题,并且增加了禁言的小功能" />
+    <MESSAGE value="重建一下git" />
+    <option name="LAST_COMMIT_MESSAGE" value="重建一下git" />
+    <option name="OPTIMIZE_IMPORTS_BEFORE_PROJECT_COMMIT" value="true" />
+    <option name="REFORMAT_BEFORE_PROJECT_COMMIT" value="true" />
+    <option name="REARRANGE_BEFORE_PROJECT_COMMIT" value="true" />
   </component>
 </project>
