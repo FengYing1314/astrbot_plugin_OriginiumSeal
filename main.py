@@ -134,8 +134,6 @@ class MyPlugin(Star):
         if sender_id in self.user_last_trigger:
             last_trigger_time = self.user_last_trigger[sender_id]
             if current_time - last_trigger_time < 3600:  # 3600秒 = 1小时
-                remaining_time = int(3600 - (current_time - last_trigger_time))
-                yield event.plain_result(f"源石封印还在冷却中，请{remaining_time}秒后再试~")
                 return
 
         # 增加随机概率决定是否处理(后续增加配置项,暂用0.5固定概率)
