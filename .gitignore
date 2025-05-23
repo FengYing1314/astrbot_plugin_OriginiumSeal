@@ -1,7 +1,2 @@
 __pycache__/
-<<<<<<< HEAD
 .idea/
-.vscode/
-=======
-*.py[cod]
->>>>>>> 245cfb1 (删除.idea目录下的配置文件，包括misc.xml、vcs.xml、workspace.xml和profiles_settings.xml，以清理项目设置。)

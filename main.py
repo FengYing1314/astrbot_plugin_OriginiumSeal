@@ -1,5 +1,3 @@
-<<<<<<< HEAD
-=======
 import io
 import os
 import random
@@ -19,10 +17,7 @@ class MyPlugin(Star):
         super().__init__(context)
         # 初始化时设置印章图片路径
         self.plugin_dir = os.path.dirname(os.path.abspath(__file__))
->>>>>>> 008cd46 (重建一下git)
         self.seal_image_path = os.path.join(self.plugin_dir, "Sealed.png")
-<<<<<<< HEAD
-=======
         if not os.path.exists(self.seal_image_path):
             logger.info(f"印章图片不存在: {self.seal_image_path}")
         # 初始化用户触发时间记录字典
@@ -194,4 +189,3 @@ class MyPlugin(Star):
 
     async def terminate(self):
         pass
->>>>>>> 150435c (添加用户触发时间记录功能，限制用户在1小时内重复触发事件)
