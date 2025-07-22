@@ -11,7 +11,7 @@ from astrbot.api.star import Context, Star, register
 from astrbot.core.platform.sources.aiocqhttp.aiocqhttp_message_event import AiocqhttpMessageEvent
 
 
-@register("OriginiumSeal", "FengYing", "让你的头像被源石封印()", "1.2.1","https://github.com/FengYing1314/astrbot_plugin_OriginiumSeal")
+@register("OriginiumSeal", "FengYing", "让你的头像被源石封印()", "1.2.2","https://github.com/FengYing1314/astrbot_plugin_OriginiumSeal")
 class MyPlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
@@ -110,10 +110,16 @@ class MyPlugin(Star):
         raw_message = event.message_obj.raw_message
         self_id = event.get_self_id()
         group_id = event.get_group_id()
-        self_id_int = int(self_id)
-        group_id_int = int(group_id)
-        sender_id = event.get_sender_id()
-        sender_id_int = int(sender_id)
+
+        # 非QQ号无法转为整数，跳过处理
+        try:
+            self_id_int = int(self_id)
+            group_id_int = int(group_id)
+            sender_id = event.get_sender_id()
+            sender_id_int = int(sender_id)
+        except ValueError:
+            logger.warning(f"非QQ号跳过处理: {event.get_sender_id()}")
+            return
 
         # 2. 检测是否为拍一拍事件
         has_poke = False
@@ -146,15 +152,19 @@ class MyPlugin(Star):
         # 判断bot是否为管理员,以及对方是否为管理员或者群主,进行判断是否可以进行禁言
         can_mute = False
         if event.get_platform_name()=="aiocqhttp":
-            assert isinstance(event, AiocqhttpMessageEvent)
-            client = event.bot
-            self_group_info = await client.api.call_action('get_group_member_info', user_id=self_id_int, group_id=group_id_int,no_cache=True)
-            sender_group_info = await client.api.call_action('get_group_member_info', user_id=sender_id_int, group_id=group_id_int,no_cache=True)
-            self_role = self_group_info.get("role", "member")
-            sender_role = sender_group_info.get("role", "member")
-            if self_role in ["admin","owner"]:
-                can_mute = True
-            if sender_role in ["admin","owner"]:
+            try:
+                assert isinstance(event, AiocqhttpMessageEvent)
+                client = event.bot
+                self_group_info = await client.api.call_action('get_group_member_info', user_id=self_id_int, group_id=group_id_int,no_cache=True)
+                sender_group_info = await client.api.call_action('get_group_member_info', user_id=sender_id_int, group_id=group_id_int,no_cache=True)
+                self_role = self_group_info.get("role", "member")
+                sender_role = sender_group_info.get("role", "member")
+                if self_role in ["admin","owner"]:
+                    can_mute = True
+                if sender_role in ["admin","owner"]:
+                    can_mute = False
+            except (ValueError, TypeError) as e:
+                logger.warning(f"群成员信息获取失败: {str(e)}")
                 can_mute = False
 
         try:
@@ -171,9 +181,13 @@ class MyPlugin(Star):
             # 如果bot为管理员,可以选择禁言,60s-600s
             duration = random.randint(60, 600)
             if can_mute:
-                client=event.bot
-                await client.api.call_action('set_group_ban', group_id=group_id_int, user_id=sender_id, duration=duration)
-                yield event.plain_result(f"封印了 {duration}s,这可是没办法的呢~")
+                try:
+                    client=event.bot
+                    await client.api.call_action('set_group_ban', group_id=group_id_int, user_id=sender_id, duration=duration)
+                    yield event.plain_result(f"封印了 {duration}s,这可是没办法的呢~")
+                except Exception as e:
+                    logger.warning(f"禁言失败: {str(e)}")
+                    # 忽略禁言错误继续执行
                 
             # 清理临时文件
             try:
