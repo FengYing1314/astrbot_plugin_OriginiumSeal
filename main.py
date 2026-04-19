@@ -10,6 +10,7 @@ from PIL import Image as PILImage
 from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.message_components import Image as MessageImage
+from astrbot.api.message_components import Poke as MessagePoke
 from astrbot.api.star import Context, Star, register
 from astrbot.core.platform.sources.aiocqhttp.aiocqhttp_message_event import (
     AiocqhttpMessageEvent,
@@ -103,6 +104,18 @@ class MyPlugin(Star):
                 return component
         return None
 
+    def _get_poke_target_id(self, event: AstrMessageEvent) -> str | None:
+        for component in getattr(event.message_obj, "message", []):
+            if isinstance(component, MessagePoke):
+                return component.target_id()
+
+        raw_message = getattr(event.message_obj, "raw_message", None)
+        if raw_message is not None and getattr(raw_message, "sub_type", None) == "poke":
+            target_id = getattr(raw_message, "target_id", None)
+            if target_id is not None:
+                return str(target_id)
+        return None
+
     async def _download_bytes(self, url: str, error_prefix: str) -> bytes:
         async with aiohttp.ClientSession() as session:
             async with session.get(url) as response:
@@ -115,6 +128,13 @@ class MyPlugin(Star):
         return await self._download_bytes(avatar_url, "获取头像失败")
 
     async def _get_image_component_bytes(self, image_component: MessageImage) -> bytes:
+        try:
+            image_path = await image_component.convert_to_file_path()
+            with open(image_path, "rb") as file:
+                return file.read()
+        except Exception as exc:
+            logger.warning(f"通过 AstrBot 标准图片接口读取附图失败，将尝试直接读取字段: {exc}")
+
         source = image_component.url or image_component.file
         if not source:
             raise ValueError("图片消息不包含可用的地址")
@@ -258,15 +278,15 @@ class MyPlugin(Star):
         if not isinstance(event, AiocqhttpMessageEvent):
             return
 
-        raw_message = getattr(event.message_obj, "raw_message", None)
-        if raw_message is None or getattr(raw_message, "sub_type", None) != "poke":
+        target_id = self._get_poke_target_id(event)
+        if not target_id:
             return
 
         self_id = event.get_self_id()
         group_id = event.get_group_id()
         sender_id = event.get_sender_id()
 
-        if str(getattr(raw_message, "target_id", "")) != str(self_id):
+        if str(target_id) != str(self_id):
             return
 
         try:

@@ -4,6 +4,10 @@ OriginiumSeal 是一个 AstrBot 插件，用来给头像或图片加上源石封
 
 当前版本：`1.3.0`
 
+## 访问统计
+
+## <a href="https://count.getloli.com/"><img src="https://count.getloli.com/get/@:astrbot_plugin_OriginiumSeal?theme=rule34"></a>
+
 ## 功能特点
 
 - 支持命令 `/制作源石封印头像`
