@@ -1,5 +1,7 @@
 name: OriginiumSeal
-desc: 这插件作用为检测拍一拍bot,使头像被源石封印,并且会进行随机禁言(更有乐趣?)
-version: v1.2.2
+desc: 让头像或附图加上源石封印效果，并支持拍一拍触发随机禁言
+version: "1.3.0"
 author: FengYing
 repo: https://github.com/FengYing1314/astrbot_plugin_OriginiumSeal
+support_platforms:
+  - aiocqhttp

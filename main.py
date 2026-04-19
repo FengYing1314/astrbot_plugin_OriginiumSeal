@@ -1,203 +1,326 @@
+import base64
 import io
 import os
 import random
+import tempfile
 import time
 
 import aiohttp
-from PIL import Image
-from astrbot.api import logger
-from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
+from PIL import Image as PILImage
+from astrbot.api import AstrBotConfig, logger
+from astrbot.api.event import AstrMessageEvent, filter
+from astrbot.api.message_components import Image as MessageImage
 from astrbot.api.star import Context, Star, register
-from astrbot.core.platform.sources.aiocqhttp.aiocqhttp_message_event import AiocqhttpMessageEvent
+from astrbot.core.platform.sources.aiocqhttp.aiocqhttp_message_event import (
+    AiocqhttpMessageEvent,
+)
+
+VERSION = "1.3.0"
+AVATAR_URL_TEMPLATE = "https://q1.qlogo.cn/g?b=qq&nk={sender_id}&s=640"
 
 
-@register("OriginiumSeal", "FengYing", "让你的头像被源石封印()", "1.2.2","https://github.com/FengYing1314/astrbot_plugin_OriginiumSeal")
+@register(
+    "OriginiumSeal",
+    "FengYing",
+    "让头像或图片被源石封印",
+    VERSION,
+    "https://github.com/FengYing1314/astrbot_plugin_OriginiumSeal",
+)
 class MyPlugin(Star):
-    def __init__(self, context: Context):
+    def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
-        # 初始化时设置印章图片路径
+        self.config = config
         self.plugin_dir = os.path.dirname(os.path.abspath(__file__))
         self.seal_image_path = os.path.join(self.plugin_dir, "Sealed.png")
         if not os.path.exists(self.seal_image_path):
-            logger.info(f"印章图片不存在: {self.seal_image_path}")
-        # 初始化用户触发时间记录字典
+            logger.warning(f"印章图片不存在: {self.seal_image_path}")
         self.user_last_trigger = {}
 
-    async def process_avatar(self, event: AstrMessageEvent, sender_id: str):
-        """
-        处理用户头像，添加源石封印效果
-        
-        Args:
-            event: 消息事件对象
-            sender_id: 发送者ID
-            
-        Returns:
-            tuple: (成功状态, 结果或错误消息, 临时图片路径)
-        """
+    def _get_bool_config(self, key: str, default: bool) -> bool:
+        value = self.config.get(key, default)
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            return value.strip().lower() in {"1", "true", "yes", "on"}
+        return bool(value)
+
+    def _get_int_config(self, key: str, default: int, minimum: int = 0) -> int:
         try:
-            # 检查印章图片是否存在
+            value = int(self.config.get(key, default))
+        except (TypeError, ValueError):
+            value = default
+        return max(minimum, value)
+
+    def _get_float_config(
+        self,
+        key: str,
+        default: float,
+        minimum: float | None = None,
+        maximum: float | None = None,
+    ) -> float:
+        try:
+            value = float(self.config.get(key, default))
+        except (TypeError, ValueError):
+            value = default
+        if minimum is not None:
+            value = max(minimum, value)
+        if maximum is not None:
+            value = min(maximum, value)
+        return value
+
+    def _is_poke_enabled(self) -> bool:
+        return self._get_bool_config("enable_poke_trigger", True)
+
+    def _is_mute_enabled(self) -> bool:
+        return self._get_bool_config("enable_mute", True)
+
+    def _get_poke_cooldown_seconds(self) -> int:
+        return self._get_int_config("poke_cooldown_seconds", 3600, minimum=0)
+
+    def _get_poke_trigger_probability(self) -> float:
+        return self._get_float_config(
+            "poke_trigger_probability",
+            0.5,
+            minimum=0.0,
+            maximum=1.0,
+        )
+
+    def _get_seal_opacity(self) -> float:
+        return self._get_float_config("seal_opacity", 0.7, minimum=0.0, maximum=1.0)
+
+    def _get_mute_range(self) -> tuple[int, int]:
+        mute_min = self._get_int_config("mute_min_seconds", 60, minimum=0)
+        mute_max = self._get_int_config("mute_max_seconds", 600, minimum=0)
+        if mute_min > mute_max:
+            mute_min, mute_max = mute_max, mute_min
+        return mute_min, mute_max
+
+    def _get_first_image_component(
+        self, event: AstrMessageEvent
+    ) -> MessageImage | None:
+        for component in getattr(event.message_obj, "message", []):
+            if isinstance(component, MessageImage):
+                return component
+        return None
+
+    async def _download_bytes(self, url: str, error_prefix: str) -> bytes:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                if response.status != 200:
+                    raise ValueError(f"{error_prefix}: HTTP {response.status}")
+                return await response.read()
+
+    async def _get_avatar_bytes(self, sender_id: str) -> bytes:
+        avatar_url = AVATAR_URL_TEMPLATE.format(sender_id=sender_id)
+        return await self._download_bytes(avatar_url, "获取头像失败")
+
+    async def _get_image_component_bytes(self, image_component: MessageImage) -> bytes:
+        source = image_component.url or image_component.file
+        if not source:
+            raise ValueError("图片消息不包含可用的地址")
+
+        if source.startswith(("http://", "https://")):
+            return await self._download_bytes(source, "获取附图失败")
+
+        if source.startswith("file:///"):
+            source = source[8:]
+        elif source.startswith("base64://"):
+            try:
+                return base64.b64decode(source.removeprefix("base64://"))
+            except Exception as exc:
+                raise ValueError("图片消息的 base64 数据无效") from exc
+
+        if os.path.exists(source):
+            with open(source, "rb") as file:
+                return file.read()
+
+        raise ValueError("无法读取附图，请确认图片消息可访问")
+
+    def _compose_sealed_image(self, image_bytes: bytes) -> PILImage.Image:
+        with PILImage.open(io.BytesIO(image_bytes)) as source_image:
+            base_image = source_image.convert("RGBA")
+        with PILImage.open(self.seal_image_path) as seal_source:
+            seal_image = seal_source.convert("RGBA")
+
+        seal_image = seal_image.resize(base_image.size)
+
+        opacity = self._get_seal_opacity()
+        if opacity < 1.0:
+            r, g, b, a = seal_image.split()
+            a = a.point(lambda value: int(value * opacity))
+            seal_image = PILImage.merge("RGBA", (r, g, b, a))
+
+        return PILImage.alpha_composite(base_image, seal_image)
+
+    def _save_temp_image(self, sender_id: str, image: PILImage.Image) -> str:
+        fd, temp_img_path = tempfile.mkstemp(
+            prefix=f"originium_seal_{sender_id}_",
+            suffix=".png",
+        )
+        os.close(fd)
+        image.save(temp_img_path, format="PNG")
+        return temp_img_path
+
+    async def process_image(
+        self,
+        sender_id: str,
+        image_component: MessageImage | None = None,
+    ) -> tuple[bool, str, str | None]:
+        try:
             if not os.path.exists(self.seal_image_path):
-                return False, "无法处理头像: 印章图片不存在", None
+                return False, "无法处理图片: 印章图片不存在", None
 
-            # 获取用户头像
-            avatar_url = f"https://q1.qlogo.cn/g?b=qq&nk={sender_id}&s=640"
-            async with aiohttp.ClientSession() as session:
-                async with session.get(avatar_url) as response:
-                    if response.status != 200:
-                        return False, f"获取头像失败: HTTP {response.status}", None
-                    avatar_data = await response.read()
+            if image_component is not None:
+                image_bytes = await self._get_image_component_bytes(image_component)
+            else:
+                image_bytes = await self._get_avatar_bytes(sender_id)
 
-            # 处理头像图片
-            # 加载图片
-            avatar_img = Image.open(io.BytesIO(avatar_data))
-            seal_img = Image.open(self.seal_image_path).convert("RGBA")
-
-            # 调整印章大小
-            seal_img = seal_img.resize(avatar_img.size)
-
-            # 设置印章透明度(70%)
-            r, g, b, a = seal_img.split()
-            a = a.point(lambda i: i * 0.7)
-            seal_img = Image.merge('RGBA', (r, g, b, a))
-
-            # 合成图片
-            if avatar_img.mode != 'RGBA':
-                avatar_img = avatar_img.convert('RGBA')
-            result_img = Image.alpha_composite(avatar_img, seal_img)
-
-            # 保存处理后的图片到临时文件
-            img_bytes = io.BytesIO()
-            result_img.save(img_bytes, format='PNG')
-            img_bytes.seek(0)
-
-            temp_img_path = os.path.join(self.plugin_dir, f"temp_seal_{sender_id}.png")
-            with open(temp_img_path, "wb") as f:
-                f.write(img_bytes.getvalue())
+            result_image = self._compose_sealed_image(image_bytes)
+            try:
+                temp_img_path = self._save_temp_image(sender_id, result_image)
+            finally:
+                result_image.close()
 
             return True, temp_img_path, temp_img_path
-        except Exception as e:
-            logger.error(f"处理头像时出错: {str(e)}")
-            return False, f"处理头像时出错: {str(e)}", None
+        except Exception as exc:
+            logger.exception("处理图片时出错")
+            return False, f"处理图片时出错: {exc}", None
+
+    async def _cleanup_temp_image(self, temp_img_path: str | None) -> None:
+        if not temp_img_path:
+            return
+        try:
+            if os.path.exists(temp_img_path):
+                os.remove(temp_img_path)
+        except Exception as exc:
+            logger.warning(f"清理临时图片失败: {exc}")
+
+    async def _can_mute_member(
+        self,
+        event: AiocqhttpMessageEvent,
+        self_id_int: int,
+        group_id_int: int,
+        sender_id_int: int,
+    ) -> bool:
+        if not self._is_mute_enabled():
+            return False
+
+        try:
+            client = event.bot
+            self_group_info = await client.api.call_action(
+                "get_group_member_info",
+                user_id=self_id_int,
+                group_id=group_id_int,
+                no_cache=True,
+            )
+            sender_group_info = await client.api.call_action(
+                "get_group_member_info",
+                user_id=sender_id_int,
+                group_id=group_id_int,
+                no_cache=True,
+            )
+        except Exception as exc:
+            logger.warning(f"群成员信息获取失败: {exc}")
+            return False
+
+        self_role = self_group_info.get("role", "member")
+        sender_role = sender_group_info.get("role", "member")
+        return self_role in {"admin", "owner"} and sender_role not in {
+            "admin",
+            "owner",
+        }
 
     @filter.command("制作源石封印头像")
     async def seal_command(self, event: AstrMessageEvent):
-        '''通过(制作源石封印头像进行触发)'''
+        """通过 /制作源石封印头像 触发。"""
         sender_id = event.get_sender_id()
-        
-        # 调用独立的头像处理函数
-        success, result, temp_img_path = await self.process_avatar(event, sender_id)
-        
-        if success:
-            # 发送处理后的图片
-            yield event.image_result(result)
-            
-            # 清理临时文件
-            try:
-                if os.path.exists(temp_img_path):
-                    os.remove(temp_img_path)
-            except Exception:
-                pass
-        else:
-            # 处理失败，发送错误消息
-            yield event.plain_result(result)
+        image_component = self._get_first_image_component(event)
+        success, result, temp_img_path = await self.process_image(
+            sender_id,
+            image_component=image_component,
+        )
 
-    # 拍一拍只监听群组消息
+        try:
+            if success:
+                yield event.image_result(result)
+            else:
+                yield event.plain_result(result)
+        finally:
+            await self._cleanup_temp_image(temp_img_path)
+
+    @filter.platform_adapter_type(filter.PlatformAdapterType.AIOCQHTTP)
     @filter.event_message_type(filter.EventMessageType.GROUP_MESSAGE)
     async def poke(self, event: AstrMessageEvent):
-        '''当用户被拍一拍时，将其头像加上"封印"效果'''
+        """当用户拍一拍 bot 时，将其头像加上封印效果。"""
+        if not self._is_poke_enabled():
+            return
 
-        # 1. 获取原始消息对象
-        raw_message = event.message_obj.raw_message
+        if not isinstance(event, AiocqhttpMessageEvent):
+            return
+
+        raw_message = getattr(event.message_obj, "raw_message", None)
+        if raw_message is None or getattr(raw_message, "sub_type", None) != "poke":
+            return
+
         self_id = event.get_self_id()
         group_id = event.get_group_id()
+        sender_id = event.get_sender_id()
 
-        # 非QQ号无法转为整数，跳过处理
+        if str(getattr(raw_message, "target_id", "")) != str(self_id):
+            return
+
         try:
             self_id_int = int(self_id)
             group_id_int = int(group_id)
-            sender_id = event.get_sender_id()
             sender_id_int = int(sender_id)
-        except ValueError:
-            logger.warning(f"非QQ号跳过处理: {event.get_sender_id()}")
+        except (TypeError, ValueError):
+            logger.warning(f"非 QQ 号跳过处理: {sender_id}")
             return
 
-        # 2. 检测是否为拍一拍事件
-        has_poke = False
-        has_poke = raw_message.sub_type == 'poke'
-
-        # 如果不是拍一拍事件，直接返回
-        if not has_poke:
-            return
-
-        # 获取发送者信息,判断Poke对象是否为bot,确保是拍了bot才会触发
-        target_id = raw_message.target_id
-        is_poke_bot_related = str(target_id) == self_id
-        if not is_poke_bot_related:
-            return
-
-        # 检查用户是否在冷却时间内
         current_time = time.time()
-        if sender_id in self.user_last_trigger:
-            last_trigger_time = self.user_last_trigger[sender_id]
-            if current_time - last_trigger_time < 3600:  # 3600秒 = 1小时
-                return
-
-        # 增加随机概率决定是否处理(后续增加配置项,暂用0.5固定概率)
-        if random.random() < 0.5:
+        last_trigger_time = self.user_last_trigger.get(sender_id)
+        cooldown_seconds = self._get_poke_cooldown_seconds()
+        if (
+            last_trigger_time is not None
+            and current_time - last_trigger_time < cooldown_seconds
+        ):
             return
 
-        # 更新用户触发时间
+        probability = self._get_poke_trigger_probability()
+        if probability <= 0 or random.random() > probability:
+            return
+
         self.user_last_trigger[sender_id] = current_time
+        can_mute = await self._can_mute_member(
+            event,
+            self_id_int,
+            group_id_int,
+            sender_id_int,
+        )
 
-        # 判断bot是否为管理员,以及对方是否为管理员或者群主,进行判断是否可以进行禁言
-        can_mute = False
-        if event.get_platform_name()=="aiocqhttp":
-            try:
-                assert isinstance(event, AiocqhttpMessageEvent)
-                client = event.bot
-                self_group_info = await client.api.call_action('get_group_member_info', user_id=self_id_int, group_id=group_id_int,no_cache=True)
-                sender_group_info = await client.api.call_action('get_group_member_info', user_id=sender_id_int, group_id=group_id_int,no_cache=True)
-                self_role = self_group_info.get("role", "member")
-                sender_role = sender_group_info.get("role", "member")
-                if self_role in ["admin","owner"]:
-                    can_mute = True
-                if sender_role in ["admin","owner"]:
-                    can_mute = False
-            except (ValueError, TypeError) as e:
-                logger.warning(f"群成员信息获取失败: {str(e)}")
-                can_mute = False
-
+        success, result, temp_img_path = await self.process_image(sender_id)
         try:
-            # 调用独立的头像处理函数
-            success, result, temp_img_path = await self.process_avatar(event, sender_id)
-            
             if not success:
                 yield event.plain_result(result)
                 return
 
-            # 发送处理后的图片
             yield event.image_result(result)
 
-            # 如果bot为管理员,可以选择禁言,60s-600s
-            duration = random.randint(60, 600)
             if can_mute:
+                mute_min, mute_max = self._get_mute_range()
+                duration = random.randint(mute_min, mute_max)
                 try:
-                    client=event.bot
-                    await client.api.call_action('set_group_ban', group_id=group_id_int, user_id=sender_id, duration=duration)
+                    await event.bot.api.call_action(
+                        "set_group_ban",
+                        group_id=group_id_int,
+                        user_id=sender_id_int,
+                        duration=duration,
+                    )
                     yield event.plain_result(f"封印了 {duration}s,这可是没办法的呢~")
-                except Exception as e:
-                    logger.warning(f"禁言失败: {str(e)}")
-                    # 忽略禁言错误继续执行
-                
-            # 清理临时文件
-            try:
-                if os.path.exists(temp_img_path):
-                    os.remove(temp_img_path)
-            except Exception:
-                pass
-        except Exception as e:
-            logger.error(f"处理头像时出错: {str(e)}")
-            yield event.plain_result(f"处理头像时出错: {str(e)}")
+                except Exception as exc:
+                    logger.warning(f"禁言失败: {exc}")
+        finally:
+            await self._cleanup_temp_image(temp_img_path)
 
     async def terminate(self):
         pass

@@ -1,0 +1,44 @@
+{
+  "enable_poke_trigger": {
+    "type": "bool",
+    "description": "是否启用拍一拍触发",
+    "hint": "关闭后将不再响应群聊中的拍一拍 bot 事件。",
+    "default": true
+  },
+  "poke_cooldown_seconds": {
+    "type": "int",
+    "description": "拍一拍冷却时间（秒）",
+    "hint": "同一用户再次触发拍一拍效果前需要等待的秒数。",
+    "default": 3600
+  },
+  "poke_trigger_probability": {
+    "type": "float",
+    "description": "拍一拍触发概率",
+    "hint": "取值范围建议为 0 到 1，例如 0.5 表示 50% 概率触发。",
+    "default": 0.5
+  },
+  "enable_mute": {
+    "type": "bool",
+    "description": "是否启用随机禁言",
+    "hint": "仅在 bot 拥有管理员权限且目标不是管理员或群主时生效。",
+    "default": true
+  },
+  "mute_min_seconds": {
+    "type": "int",
+    "description": "最短禁言时长（秒）",
+    "hint": "随机禁言时长下限。",
+    "default": 60
+  },
+  "mute_max_seconds": {
+    "type": "int",
+    "description": "最长禁言时长（秒）",
+    "hint": "随机禁言时长上限，小于最短时长时会自动交换。",
+    "default": 600
+  },
+  "seal_opacity": {
+    "type": "float",
+    "description": "封印图层透明度",
+    "hint": "取值范围建议为 0 到 1，数值越大封印效果越明显。",
+    "default": 0.7
+  }
+}
